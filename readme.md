@@ -15,6 +15,8 @@ run
 ```
 
 # Compiling the payload
+**Ensure you have changed the host and port variables in the msf_rev_https.go file.**
+
 The following examples assume you have a shell open in the directory of the msf_rev_https.go file.
 
 These will result in a `.exe` file that will call back to your msfconsole listener.
