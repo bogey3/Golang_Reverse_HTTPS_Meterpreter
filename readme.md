@@ -23,7 +23,7 @@ These will result in a `.exe` file that will call back to your msfconsole listen
 ### Windows
     go build -ldflags "-H=windowsgui -w -s" -o newExecutable.exe . 
 ### Linux
-    env GOOS=windows GOARCH=amd64 go build -ldflags "-s -w -H=windowsgui -o newExecutable.exe .
+    env GOOS=windows GOARCH=amd64 go build -ldflags "-s -w -H=windowsgui" -o newExecutable.exe .
 
 # Detection
 Custom payloads are difficult to detect, at the time of writing this payload was flagged by 3/68 antiviruses on VirusTotal. It is important to note that this is quite low, non-malicious executables are often flagged as well. I have linked below the results from my "newExecutable.exe", and one for putty.exe.
