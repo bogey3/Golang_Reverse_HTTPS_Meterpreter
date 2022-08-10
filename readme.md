@@ -24,9 +24,3 @@ These will result in a `.exe` file that will call back to your msfconsole listen
     go build -trimpath -ldflags "-H=windowsgui -w -s" -o newExecutable.exe . 
 ### Linux
     env GOOS=windows GOARCH=amd64 go build -trimpath -ldflags "-s -w -H=windowsgui" -o newExecutable.exe .
-
-# Detection
-Custom payloads are difficult to detect, at the time of writing this payload was flagged by 3/68 antiviruses on VirusTotal. It is important to note that this is quite low, non-malicious executables are often flagged as well. I have linked below the results from my "newExecutable.exe", and one for putty.exe.
-
-My Go reverse HTTPS meterpreter: https://www.virustotal.com/gui/file/26ac135ef4e7ed030186fc91338989bcbcebfc44c2cb54bc48ace9802097d51b/detection <br>
-PuTTY v0.74: https://www.virustotal.com/gui/file/f032c50564a21c39a8c85873a4c96f09eb6398330c67291408497816401957f6/detection
